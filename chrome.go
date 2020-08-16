@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
+	//"log"
 	"os/exec"
 	"regexp"
 	"sync"
@@ -47,7 +47,11 @@ type chrome struct {
 	bindings map[string]bindingFunc
 }
 
-func newChromeWithArgs(chromeBinary string, args ...string) (*chrome, error) {
+var loglineFunc func(arg string) = nil
+
+func newChromeWithArgs(chromeBinary string, logline func(arg string), args ...string) (*chrome, error) {
+	loglineFunc = logline
+
 	// The first two IDs are used internally during the initialization
 	c := &chrome{
 		id:       2,
@@ -270,7 +274,32 @@ func (c *chrome) readLoop() {
 			json.Unmarshal([]byte(params.Message), &res)
 
 			if res.ID == 0 && res.Method == "Runtime.consoleAPICalled" || res.Method == "Runtime.exceptionThrown" {
-				log.Println(params.Message)
+				// tmtmtm reconstruct (best as we can) the original JS console.log() msg
+				if len(res.Params.Args)==1 {
+					loglineFunc(res.Params.Args[0].Value.(string))
+				} else if len(res.Params.Args)==2 {
+					loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value))
+				} else if len(res.Params.Args)==3 {
+					loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value,
+						res.Params.Args[2].Value))
+				} else if len(res.Params.Args)==4 {
+					loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value,
+						res.Params.Args[2].Value, res.Params.Args[3].Value))
+				} else if len(res.Params.Args)==5 {
+					loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value,
+						res.Params.Args[2].Value, res.Params.Args[3].Value, res.Params.Args[4].Value))
+				} else if len(res.Params.Args)==6 {
+					loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value,
+						res.Params.Args[2].Value, res.Params.Args[3].Value, res.Params.Args[4].Value,
+						res.Params.Args[5].Value))
+				} else if len(res.Params.Args)==7 {
+					loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value,
+						res.Params.Args[2].Value, res.Params.Args[3].Value, res.Params.Args[4].Value,
+						res.Params.Args[5].Value, res.Params.Args[6].Value))
+				} else {
+					// default lorca behavior: dump json
+					loglineFunc(params.Message)
+				}
 			} else if res.ID == 0 && res.Method == "Runtime.bindingCalled" {
 				payload := struct {
 					Name string            `json:"name"`
