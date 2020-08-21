@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	//"log"
 	"os/exec"
 	"regexp"
 	"sync"
@@ -45,18 +44,17 @@ type chrome struct {
 	window   int
 	pending  map[int]chan result
 	bindings map[string]bindingFunc
+	loglineFunc func(arg string)
 }
 
-var loglineFunc func(arg string) = nil
-
 func newChromeWithArgs(chromeBinary string, logline func(arg string), args ...string) (*chrome, error) {
-	loglineFunc = logline
 
 	// The first two IDs are used internally during the initialization
 	c := &chrome{
 		id:       2,
 		pending:  map[int]chan result{},
 		bindings: map[string]bindingFunc{},
+		loglineFunc: logline,
 	}
 
 	// Start chrome process
@@ -276,29 +274,29 @@ func (c *chrome) readLoop() {
 			if res.ID == 0 && res.Method == "Runtime.consoleAPICalled" || res.Method == "Runtime.exceptionThrown" {
 				// tmtmtm reconstruct (best as we can) the original JS console.log() msg
 				if len(res.Params.Args)==1 {
-					loglineFunc(res.Params.Args[0].Value.(string))
+					c.loglineFunc(res.Params.Args[0].Value.(string))
 				} else if len(res.Params.Args)==2 {
-					loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value))
+					c.loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value))
 				} else if len(res.Params.Args)==3 {
-					loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value,
+					c.loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value,
 						res.Params.Args[2].Value))
 				} else if len(res.Params.Args)==4 {
-					loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value,
+					c.loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value,
 						res.Params.Args[2].Value, res.Params.Args[3].Value))
 				} else if len(res.Params.Args)==5 {
-					loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value,
+					c.loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value,
 						res.Params.Args[2].Value, res.Params.Args[3].Value, res.Params.Args[4].Value))
 				} else if len(res.Params.Args)==6 {
-					loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value,
+					c.loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value,
 						res.Params.Args[2].Value, res.Params.Args[3].Value, res.Params.Args[4].Value,
 						res.Params.Args[5].Value))
 				} else if len(res.Params.Args)==7 {
-					loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value,
+					c.loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value,
 						res.Params.Args[2].Value, res.Params.Args[3].Value, res.Params.Args[4].Value,
 						res.Params.Args[5].Value, res.Params.Args[6].Value))
 				} else {
 					// default lorca behavior: dump json
-					loglineFunc(params.Message)
+					c.loglineFunc(params.Message)
 				}
 			} else if res.ID == 0 && res.Method == "Runtime.bindingCalled" {
 				payload := struct {

@@ -18,6 +18,7 @@ type UI interface {
 	Eval(js string) Value
 	Done() <-chan struct{}
 	Close() error
+	GetPID() int
 }
 
 type ui struct {
@@ -89,6 +90,10 @@ func New(url, dir string, logline func(arg string), width, height int, customArg
 		close(done)
 	}()
 	return &ui{chrome: chrome, done: done, tmpDir: tmpDir}, nil
+}
+
+func (u *ui) GetPID() int {
+	return u.chrome.cmd.Process.Pid
 }
 
 func (u *ui) Done() <-chan struct{} {
