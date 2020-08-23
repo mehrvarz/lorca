@@ -75,9 +75,10 @@ func New(url, dir string, logline func(arg string), width, height int, customArg
 	}
 	args := append(defaultChromeArgs, fmt.Sprintf("--app=%s", url))
 	args = append(args, fmt.Sprintf("--user-data-dir=%s", dir))
-	args = append(args, fmt.Sprintf("--window-size=%d,%d", width, height))
+//	args = append(args, fmt.Sprintf("--window-size=%d,%d", width, height)) // lorca-default
 	args = append(args, customArgs...)
-	args = append(args, "--remote-debugging-port=0")
+//	args = append(args, "--remote-debugging-port=0") // lorca-default
+//	args = append(args, "--remote-debugging-port=9222")
 
 	chrome, err := newChromeWithArgs(ChromeExecutable(), logline, args...)
 	done := make(chan struct{})
