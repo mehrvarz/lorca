@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"sync"
 	"sync/atomic"
+	"strings"
 
 	"golang.org/x/net/websocket"
 )
@@ -47,8 +48,10 @@ type chrome struct {
 	loglineFunc func(arg string)
 }
 
-func newChromeWithArgs(chromeBinary string, logline func(arg string), args ...string) (*chrome, error) {
-
+func newChromeWithArgs(	chromeBinary string,
+						logline func(arg string), // JS log.debug() to Logm
+						chromeConsole bool, // pipe chrome console to stderr
+						args ...string) (*chrome, error) {
 	// The first two IDs are used internally during the initialization
 	c := &chrome{
 		id:       2,
@@ -67,6 +70,7 @@ func newChromeWithArgs(chromeBinary string, logline func(arg string), args ...st
 		return nil, err
 	}
 
+/*
 	// Wait for websocket address to be printed to stderr
 	re := regexp.MustCompile(`^DevTools listening on (ws://.*?)\r?\n$`)
 	m, err := readUntilMatch(pipe, re)
@@ -75,6 +79,32 @@ func newChromeWithArgs(chromeBinary string, logline func(arg string), args ...st
 		return nil, err
 	}
 	wsURL := m[1]
+*/
+	// we read c.cmd.StderrPipe differently, bc after wsURL has been received
+	// we may want to continue piping c.cmd.StderrPipe to stdout
+	wsURL := ""
+	scanner := bufio.NewScanner(pipe)
+	// step 1: wait for wsURL
+    for scanner.Scan() {
+		if chromeConsole {
+	        fmt.Printf("CHRLOG: %s\n", scanner.Text())
+		}
+		if strings.HasPrefix(scanner.Text(),"DevTools listening on ") {
+			wsURL = scanner.Text()[len("DevTools listening on "):]
+	            fmt.Printf("chromium wsURL=%s\n", wsURL)
+			break
+		}
+    }
+
+	if chromeConsole {
+		// step 2: start goroutine to pipe c.cmd.StderrPipe to stdout
+		go func() {
+		    fmt.Printf("reading CHRLOG...\n")
+		    for scanner.Scan() {
+		        fmt.Printf("CHRLOG: %s\n", scanner.Text())
+		    }
+		}()
+	 }
 
 	// Open a websocket
 	c.ws, err = websocket.Dial(wsURL, "", "http://127.0.0.1")
