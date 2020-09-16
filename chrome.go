@@ -9,9 +9,9 @@ import (
 	"io/ioutil"
 	"os/exec"
 	"regexp"
+	"strings"
 	"sync"
 	"sync/atomic"
-	"strings"
 
 	"golang.org/x/net/websocket"
 )
@@ -37,26 +37,26 @@ type msg struct {
 
 type chrome struct {
 	sync.Mutex
-	cmd      *exec.Cmd
-	ws       *websocket.Conn
-	id       int32
-	target   string
-	session  string
-	window   int
-	pending  map[int]chan result
-	bindings map[string]bindingFunc
+	cmd         *exec.Cmd
+	ws          *websocket.Conn
+	id          int32
+	target      string
+	session     string
+	window      int
+	pending     map[int]chan result
+	bindings    map[string]bindingFunc
 	loglineFunc func(arg string)
 }
 
-func newChromeWithArgs(	chromeBinary string,
-						logline func(arg string), // JS log.debug() to Logm
-						chromeConsole bool, // pipe chrome console to stderr
-						args ...string) (*chrome, error) {
+func newChromeWithArgs(chromeBinary string,
+	logline func(arg string), // JS log.debug() to Logm
+	chromeConsole bool, // pipe chrome console to stderr
+	args ...string) (*chrome, error) {
 	// The first two IDs are used internally during the initialization
 	c := &chrome{
-		id:       2,
-		pending:  map[int]chan result{},
-		bindings: map[string]bindingFunc{},
+		id:          2,
+		pending:     map[int]chan result{},
+		bindings:    map[string]bindingFunc{},
 		loglineFunc: logline,
 	}
 
@@ -70,41 +70,41 @@ func newChromeWithArgs(	chromeBinary string,
 		return nil, err
 	}
 
-/*
-	// Wait for websocket address to be printed to stderr
-	re := regexp.MustCompile(`^DevTools listening on (ws://.*?)\r?\n$`)
-	m, err := readUntilMatch(pipe, re)
-	if err != nil {
-		c.kill()
-		return nil, err
-	}
-	wsURL := m[1]
-*/
+	/*
+		// Wait for websocket address to be printed to stderr
+		re := regexp.MustCompile(`^DevTools listening on (ws://.*?)\r?\n$`)
+		m, err := readUntilMatch(pipe, re)
+		if err != nil {
+			c.kill()
+			return nil, err
+		}
+		wsURL := m[1]
+	*/
 	// we read c.cmd.StderrPipe differently, bc after wsURL has been received
 	// we may want to continue piping c.cmd.StderrPipe to stdout
 	wsURL := ""
 	scanner := bufio.NewScanner(pipe)
 	// step 1: wait for wsURL
-    for scanner.Scan() {
+	for scanner.Scan() {
 		if chromeConsole {
-	        fmt.Printf("CHRLOG: %s\n", scanner.Text())
+			fmt.Printf("CHRLOG: %s\n", scanner.Text())
 		}
-		if strings.HasPrefix(scanner.Text(),"DevTools listening on ") {
+		if strings.HasPrefix(scanner.Text(), "DevTools listening on ") {
 			wsURL = scanner.Text()[len("DevTools listening on "):]
-	            fmt.Printf("chromium wsURL=%s\n", wsURL)
+			fmt.Printf("chromium wsURL=%s\n", wsURL)
 			break
 		}
-    }
+	}
 
 	if chromeConsole {
 		// step 2: start goroutine to pipe c.cmd.StderrPipe to stdout
 		go func() {
-		    fmt.Printf("reading CHRLOG...\n")
-		    for scanner.Scan() {
-		        fmt.Printf("CHRLOG: %s\n", scanner.Text())
-		    }
+			fmt.Printf("reading CHRLOG...\n")
+			for scanner.Scan() {
+				fmt.Printf("CHRLOG: %s\n", scanner.Text())
+			}
 		}()
-	 }
+	}
 
 	// Open a websocket
 	c.ws, err = websocket.Dial(wsURL, "", "http://127.0.0.1")
@@ -303,24 +303,24 @@ func (c *chrome) readLoop() {
 
 			if res.ID == 0 && res.Method == "Runtime.consoleAPICalled" || res.Method == "Runtime.exceptionThrown" {
 				// tmtmtm reconstruct (best as we can) the original JS console.log() msg
-				if len(res.Params.Args)==1 {
+				if len(res.Params.Args) == 1 {
 					c.loglineFunc(res.Params.Args[0].Value.(string))
-				} else if len(res.Params.Args)==2 {
+				} else if len(res.Params.Args) == 2 {
 					c.loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value))
-				} else if len(res.Params.Args)==3 {
+				} else if len(res.Params.Args) == 3 {
 					c.loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value,
 						res.Params.Args[2].Value))
-				} else if len(res.Params.Args)==4 {
+				} else if len(res.Params.Args) == 4 {
 					c.loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value,
 						res.Params.Args[2].Value, res.Params.Args[3].Value))
-				} else if len(res.Params.Args)==5 {
+				} else if len(res.Params.Args) == 5 {
 					c.loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value,
 						res.Params.Args[2].Value, res.Params.Args[3].Value, res.Params.Args[4].Value))
-				} else if len(res.Params.Args)==6 {
+				} else if len(res.Params.Args) == 6 {
 					c.loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value,
 						res.Params.Args[2].Value, res.Params.Args[3].Value, res.Params.Args[4].Value,
 						res.Params.Args[5].Value))
-				} else if len(res.Params.Args)==7 {
+				} else if len(res.Params.Args) == 7 {
 					c.loglineFunc(fmt.Sprintf(res.Params.Args[0].Value.(string), res.Params.Args[1].Value,
 						res.Params.Args[2].Value, res.Params.Args[3].Value, res.Params.Args[4].Value,
 						res.Params.Args[5].Value, res.Params.Args[6].Value))
